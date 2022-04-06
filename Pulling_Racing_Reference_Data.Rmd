@@ -1,0 +1,72 @@
+---
+title: "Pulling Racing Reference Data"
+author: "Ben"
+date: '2022-04-06'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r Function, echo=FALSE}
+pull_data_RR <- function(START_WEEK,END_WEEK,YEAR) {
+  
+  XPATH <- "/html/body/div[1]/table[3]/tbody/tr/td"
+  BASE_URL <-
+    "https://www.racing-reference.info/loopdata/YEAR-RACE/W"
+  YEARS = as.character(YEAR)
+  RACES = START_WEEK:END_WEEK
+  RACES = sprintf("%02d", RACES)
+  all_races = data.frame()
+  for (yr in 1:length(YEARS)) {
+    for (rc in 1:length(RACES)) {
+      tmpURL = str_replace(str_replace(BASE_URL, "YEAR", YEARS[yr]), "RACE", RACES[rc])
+      tmp <- read_html(tmpURL)
+      # Racing Reference Driver Data
+      print(rc)
+      title <- tmp %>%
+        html_nodes('table')
+      title <- title[[4]] %>% html_nodes('table') %>% html_table(fill=TRUE)
+      tmpdf <- title[[1]]
+      tmpdf <- tmpdf[-c(1:2), c(1:19)]
+      names(tmpdf) <- tmpdf[1, ]
+      tmpdf <- tmpdf[-c(1), ]
+      tmpdf$RACENUM <- RACES[rc]
+      #tmpdf$RACE <- race
+      tmpdf$YEAR <- YEAR
+      all_races <- rbind(all_races, tmpdf)
+    }
+  }
+  
+  Place = sort(c(4:42, 46), decreasing = TRUE)
+  all_races[, 2:19] <- sapply(all_races[, 2:19, 21:23], as.numeric)
+  all_races$Score <- 0
+  all_races$Score <- all_races$`Laps Led` * .25 +
+    all_races$Start -
+    all_races$Finish +
+    all_races$`Fastest Lap` * .5
+  for (i in 1:length(all_races$Score)) {
+    all_races$Score[i] <-
+      all_races$Score[i] + Place[as.numeric(all_races$Finish[i])]
+  }
+  all_races <- all_races %>% drop_na()
+  return(all_races)
+}
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
